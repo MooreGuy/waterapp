@@ -130,7 +130,7 @@ func connectResponse(conn net.Conn) {
 }
 
 func clientFunc() {
-	conn, err := net.Dial("tcp", "localhost:8080")
+	conn, err := net.Dial("tcp", "home.guywmoore.com:8080")
 	defer conn.Close()
 	if err != nil {
 		log.Fatal("Error opening connection.")
