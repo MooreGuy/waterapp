@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"i2c"
 	"log"
 	"net"
 	"strings"
@@ -130,6 +131,17 @@ func connectResponse(conn net.Conn) {
 }
 
 func clientFunc() {
+	i2cDevice, err := i2c.New(0x26, 1)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+	defer i2cDevice.Close()
+
+	wat, err := i2cDevice.WriteByte(1)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
 	conn, err := net.Dial("tcp", "home.guywmoore.com:8080")
 	if err != nil {
 		log.Fatal("Error opening connection.", err.Error())
