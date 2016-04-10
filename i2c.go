@@ -6,7 +6,7 @@
 //
 // Each i2c bus can address 127 independent i2c devices, and most
 // linux systems contain several buses.
-package i2c
+package main
 
 import (
 	"fmt"

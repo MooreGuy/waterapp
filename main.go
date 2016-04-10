@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"i2c"
 	"log"
 	"net"
 	"strings"
@@ -131,7 +130,7 @@ func connectResponse(conn net.Conn) {
 }
 
 func clientFunc() {
-	i2cDevice, err := i2c.New(0x26, 1)
+	i2cDevice, err := New(0x26, 1)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -141,6 +140,16 @@ func clientFunc() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+
+	var buf []byte = []byte{}
+	read, err := i2cDevice.Read(buf)
+	if err != nil {
+		log.Fatal(err.Error())
+	}
+
+	log.Println("Read this from the arduino: " + string(buf))
+	log.Print("Bytes read: ")
+	log.Println(read)
 
 	conn, err := net.Dial("tcp", "home.guywmoore.com:8080")
 	if err != nil {
