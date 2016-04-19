@@ -101,7 +101,8 @@ func sendHeartbeat(conn net.Conn) {
 	data := 123
 	message := Message{"signal": signalHeartbeat, "data": data}
 	if err := writeJSON(conn, message); err != nil {
-		log.Fatal(err.Error())
+		log.Print("Sending heartbeat failed. ")
+		log.Println(err.Error())
 	}
 }
 
@@ -109,7 +110,8 @@ func heartbeatResponse(conn net.Conn) {
 	data := 123
 	message := Message{"signal": signalHeartbeatResponse, "data": data}
 	if err := writeJSON(conn, message); err != nil {
-		log.Fatal(err.Error())
+		log.Print("Error getting heartbeat response.")
+		log.Println(err.Error())
 	}
 }
 
@@ -198,7 +200,7 @@ func readJSON(conn net.Conn) interface{} {
 	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	rawMessage, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil {
-		log.Fatal(err.Error())
+		log.Println(err.Error())
 	}
 	log.Println("receiving", rawMessage)
 
