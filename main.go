@@ -143,7 +143,7 @@ func clientFunc() {
 		log.Fatal(err.Error())
 	}
 
-	var buf []byte = []byte{}
+	var buf []byte = make([]byte, 1)
 	read, err := i2cDevice.Read(buf)
 	if err != nil {
 		log.Fatal(err.Error())
