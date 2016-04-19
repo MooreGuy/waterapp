@@ -44,6 +44,7 @@ func main() {
 	}
 }
 
+
 func serverFunc() {
 	listener, err := net.Listen("tcp", ":8080")
 	if err != nil {
@@ -71,14 +72,18 @@ func handleConnection(conn net.Conn) {
 }
 
 func serverReadMessage(conn net.Conn) {
-	message, ok := readJSON(conn).(map[string]interface{})
-	if !ok {
-		log.Println("Skipping")
+	json, err := readJSON(conn)
+	if err != nil {
+		log.Print("Error reading json: ")
+		log.Println(err.Error())
 		return
-		log.Fatal("Could not assert message to map[string]interface{}")
+	}
+	mapMessage, ok := json.(map[string]interface{})
+	if !ok {
+		log.Fatal("Could not assert message type to map[string]interface{}")
 	}
 
-	signal, ok := message["signal"].(string)
+	signal, ok := mapMessage["signal"].(string)
 	if !ok {
 		log.Fatal("Could assert signal type to string.")
 	}
@@ -169,14 +174,20 @@ func clientFunc() {
 }
 
 func clientReadMessage(conn net.Conn) {
-	message, ok := readJSON(conn).(map[string]interface{})
-	if !ok {
-		log.Println("Skipping")
+	message, err := readJSON(conn)
+	if err != nil {
+		log.Println("Error reading json.")
+		log.Println(err.Error())
 		return
-		log.Fatal("Could not assert message to map[string]interface{}")
 	}
 
-	signal, ok := message["signal"].(string)
+	typedMessage, ok := message.(map[string]interface{})
+	if !ok {
+		log.Fatal("Could not assert type of message.")
+	}
+	
+
+	signal, ok := typedMessage["signal"].(string)
 	if !ok {
 		log.Fatal("Could assert signal type to string.")
 	}
@@ -195,12 +206,12 @@ func clientReadMessage(conn net.Conn) {
 	}
 }
 
-func readJSON(conn net.Conn) interface{} {
+func readJSON(conn net.Conn) (interface{}, error) {
 	// Set deadline for 3 seconds from now.
 	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
 	rawMessage, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil {
-		log.Println(err.Error())
+		return nil, err
 	}
 	log.Println("receiving", rawMessage)
 
@@ -211,7 +222,7 @@ func readJSON(conn net.Conn) interface{} {
 	decoder := json.NewDecoder(strings.NewReader(jsonMessage))
 	decoder.Decode(&decodedMessage)
 
-	return decodedMessage
+	return decodedMessage, nil
 }
 
 func writeJSON(conn net.Conn, jsonObject interface{}) error {
