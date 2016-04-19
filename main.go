@@ -138,7 +138,7 @@ func clientFunc() {
 	}
 	defer i2cDevice.Close()
 
-	wat, err := i2cDevice.WriteByte(0x01)
+	_, err = i2cDevice.WriteByte(0x01)
 	if err != nil {
 		log.Fatal(err.Error())
 	}
