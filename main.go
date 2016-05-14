@@ -3,10 +3,12 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
 	"net"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -14,6 +16,9 @@ import (
 const (
 	client = "client"
 	server = "server"
+
+	signalField = "signal"
+	dataField   = "data"
 
 	signalResponse       = "response"
 	signalConnect        = "connect"
@@ -26,6 +31,9 @@ const (
 
 	signalHeartbeat         = "heartbeat"
 	signalHeartbeatResponse = "heartbeat_response"
+
+	connectI2CDevice   = 0xFE
+	connectI2CResponse = 0xFF
 )
 
 type Message map[string]interface{}
@@ -43,7 +51,6 @@ func main() {
 		log.Fatal("Unknown mode: " + *mode)
 	}
 }
-
 
 func serverFunc() {
 	listener, err := net.Listen("tcp", ":8080")
@@ -66,26 +73,29 @@ func handleConnection(conn net.Conn) {
 	for {
 		time.Sleep(time.Second)
 
-		serverReadMessage(conn)
+		err := serverReadMessage(conn)
+		if err != nil {
+			log.Println(err.Error())
+		}
+
 		sendHeartbeat(conn)
 	}
 }
 
-func serverReadMessage(conn net.Conn) {
+func serverReadMessage(conn net.Conn) error {
 	json, err := readJSON(conn)
 	if err != nil {
 		log.Print("Error reading json: ")
-		log.Println(err.Error())
-		return
+		return err
 	}
 	mapMessage, ok := json.(map[string]interface{})
 	if !ok {
-		log.Fatal("Could not assert message type to map[string]interface{}")
+		return errors.New("Could not assert message type to map[string]interface{}")
 	}
 
 	signal, ok := mapMessage["signal"].(string)
 	if !ok {
-		log.Fatal("Could assert signal type to string.")
+		return errors.New("Could assert signal type to string.")
 	}
 
 	if signal == signalConnect {
@@ -100,10 +110,20 @@ func serverReadMessage(conn net.Conn) {
 	} else {
 		log.Print("unknown signal")
 	}
+
+	return nil
+}
+
+func sendDummyFlow(conn net.Conn) {
+	data := 123
+	message := Message{signalField: signalFlowResponse, dataField: data}
+	if err := writeJSON(conn, message); err != nil {
+		log.Print("Sending flow failed.")
+	}
 }
 
 func sendHeartbeat(conn net.Conn) {
-	data := 123
+	data := 0
 	message := Message{"signal": signalHeartbeat, "data": data}
 	if err := writeJSON(conn, message); err != nil {
 		log.Print("Sending heartbeat failed. ")
@@ -111,13 +131,14 @@ func sendHeartbeat(conn net.Conn) {
 	}
 }
 
-func heartbeatResponse(conn net.Conn) {
-	data := 123
+func heartbeatResponse(conn net.Conn) error {
+	data := 0
 	message := Message{"signal": signalHeartbeatResponse, "data": data}
 	if err := writeJSON(conn, message); err != nil {
-		log.Print("Error getting heartbeat response.")
-		log.Println(err.Error())
+		return err
 	}
+
+	return nil
 }
 
 func connectRequest(conn net.Conn) {
@@ -137,26 +158,8 @@ func connectResponse(conn net.Conn) {
 }
 
 func clientFunc() {
-	i2cDevice, err := New(0x26, 1)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-	defer i2cDevice.Close()
-
-	_, err = i2cDevice.WriteByte(0x01)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	var buf []byte = make([]byte, 1)
-	read, err := i2cDevice.Read(buf)
-	if err != nil {
-		log.Fatal(err.Error())
-	}
-
-	log.Println("Read this from the arduino: " + string(buf))
-	log.Print("Bytes read: ")
-	log.Println(read)
+	//devices := findDevices()
+	//sendTestMessage(devices)
 
 	conn, err := net.Dial("tcp", "home.guywmoore.com:8080")
 	if err != nil {
@@ -167,43 +170,57 @@ func clientFunc() {
 	connectRequest(conn)
 
 	for {
-		clientReadMessage(conn)
+		if err := clientReadMessage(conn); err != nil {
+			log.Println("Reading from sockets has its problems.")
+		}
+
+		sendDummyFlow(conn)
 
 		time.Sleep(time.Second)
 	}
 }
 
-func clientReadMessage(conn net.Conn) {
+func clientReadMessage(conn net.Conn) error {
 	message, err := readJSON(conn)
 	if err != nil {
 		log.Println("Error reading json.")
-		log.Println(err.Error())
-		return
+		return err
 	}
 
 	typedMessage, ok := message.(map[string]interface{})
 	if !ok {
-		log.Fatal("Could not assert type of message.")
+		return errors.New("Could not assert type of message.")
 	}
-	
 
 	signal, ok := typedMessage["signal"].(string)
 	if !ok {
-		log.Fatal("Could assert signal type to string.")
+		return errors.New("Could assert signal type to string.")
 	}
 
+	data, ok := typedMessage["data"].(int)
+	if !ok {
+		return errors.New("Data field wasn't a number.")
+	}
+
+	log.Println("data: " + strconv.Itoa(data))
 	if signal == signalFlow {
 		log.Print("Flow request received")
 	} else if signal == signalLevel {
 		log.Print("Level request received")
 	} else if signal == signalHeartbeat {
 		log.Print("Heartbeat received")
-		heartbeatResponse(conn)
+		if err := heartbeatResponse(conn); err != nil {
+			log.Print("Error getting heartbeat response.")
+			log.Println(err.Error())
+			return err
+		}
 	} else if signal == signalConnectConfirm {
 		log.Println("Successfully connected to master server.")
 	} else {
 		log.Print("unknown signal")
 	}
+
+	return nil
 }
 
 func readJSON(conn net.Conn) (interface{}, error) {
