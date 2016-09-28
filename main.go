@@ -1,3 +1,8 @@
+/*
+	TODO:
+		Authenticate connections
+		CLI shell
+*/
 package main
 
 import (
@@ -6,6 +11,7 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"strconv"
@@ -14,45 +20,34 @@ import (
 )
 
 const (
-	client = "client"
-	server = "server"
+	clientMode = "client"
+	serverMode = "server"
 
 	signalField = "signal"
 	dataField   = "data"
 
-	signalResponse       = "response"
-	signalConnect        = "connect"
-	signalConnectConfirm = "connect_confirm"
-
-	signalFlow          = "flow"
-	signalFlowResponse  = "flow_response"
-	signalLevel         = "level"
-	signalLevelResponse = "level_response"
-
 	signalHeartbeat         = "heartbeat"
 	signalHeartbeatResponse = "heartbeat_response"
-
-	connectI2CDevice   = 0xFE
-	connectI2CResponse = 0xFF
 )
 
 type Message map[string]interface{}
 
 func main() {
 	var mode = flag.String("mode", "client",
-		"Run the program in either client mode")
+		"Run the program in either shell mode or server mode")
 	flag.Parse()
 
-	if *mode == client {
-		clientFunc()
-	} else if *mode == server {
-		serverFunc()
+	if *mode == clientMode {
+		cliShell()
+	} else if *mode == serverMode {
+		startDaemon()
 	} else {
 		log.Fatal("Unknown mode: " + *mode)
 	}
 }
 
-func serverFunc() {
+func startDaemon() {
+	log.Println("Starting server.")
 	listener, err := net.Listen("tcp", ":8080")
 	if err != nil {
 		log.Fatal(err.Error())
@@ -63,62 +58,84 @@ func serverFunc() {
 		if err != nil {
 			log.Fatal(err.Error())
 		}
+
+		// Talking to clients happens her.
 		go handleConnection(conn)
 	}
 }
 
+func cliShell() {
+	log.Println("Connecting to server daemon")
+	conn, err := net.Dial("tcp", "localhost:8080")
+	if err != nil {
+		log.Fatal("Error opening connection.", err.Error())
+	}
+	defer conn.Close()
+
+	messageChannel := make(chan Message, 10)
+	go handleConnection(conn)
+	go outgoingChannel(conn, messageChannel)
+
+	var data int = -1
+	for {
+		var input string
+		_, err = fmt.Scanln(&input)
+		if err != nil {
+			log.Println(err.Error())
+			continue
+		}
+
+		data, err = strconv.Atoi(input)
+		if err != nil {
+			log.Println("Bad input, enter number.")
+			data = -1
+		}
+
+		log.Println("Sending: ", data)
+
+		message := Message{"signal": signalHeartbeat, "data": data}
+		messageChannel <- message
+	}
+}
+
+func outgoingChannel(conn net.Conn, outgoing chan Message) {
+	defer conn.Close()
+
+	for {
+		currentMessage := <-outgoing
+
+		log.Println("sent")
+		err := writeJSON(conn, currentMessage)
+		if err != nil {
+			log.Println(err.Error())
+		}
+	}
+}
+
+// Add CLI here.
 func handleConnection(conn net.Conn) {
 	defer conn.Close()
 
 	for {
-		time.Sleep(time.Second)
-
-		err := serverReadMessage(conn)
+		err := readJSONMessage(conn)
 		if err != nil {
+			opErr, ok := err.(net.Error)
+			if ok {
+				if !opErr.Temporary() {
+					return
+				} else {
+					continue
+				}
+
+			}
+
+			if err == io.EOF {
+				return
+			}
+
 			log.Println(err.Error())
 		}
 
-		sendHeartbeat(conn)
-	}
-}
-
-func serverReadMessage(conn net.Conn) error {
-	json, err := readJSON(conn)
-	if err != nil {
-		log.Print("Error reading json: ")
-		return err
-	}
-	mapMessage, ok := json.(map[string]interface{})
-	if !ok {
-		return errors.New("Could not assert message type to map[string]interface{}")
-	}
-
-	signal, ok := mapMessage["signal"].(string)
-	if !ok {
-		return errors.New("Could assert signal type to string.")
-	}
-
-	if signal == signalConnect {
-		log.Print("Request to connect received")
-		connectResponse(conn)
-	} else if signal == signalFlowResponse {
-		log.Print("Flow response received")
-	} else if signal == signalLevelResponse {
-		log.Print("Level response received")
-	} else if signal == signalHeartbeatResponse {
-		log.Print("Heartbeat response received")
-	} else {
-		log.Print("unknown signal")
-	}
-
-	return nil
-}
-
-func sendDummyFlow(conn net.Conn) {
-	data := 123
-	message := Message{signalField: signalFlowResponse, dataField: data}
-	if err := writeJSON(conn, message); err != nil {
-		log.Print("Sending flow failed.")
 	}
 }
 
@@ -141,53 +158,18 @@ func heartbeatResponse(conn net.Conn) error {
 	return nil
 }
 
-func connectRequest(conn net.Conn) {
-	data := 123
-	message := Message{"signal": signalConnect, "data": data}
-	if err := writeJSON(conn, message); err != nil {
-		log.Fatal(err.Error())
-	}
-}
-
-func connectResponse(conn net.Conn) {
-	data := 123
-	message := Message{"signal": signalConnectConfirm, "data": data}
-	if err := writeJSON(conn, message); err != nil {
-		log.Fatal(err.Error())
-	}
-}
-
-func clientFunc() {
-	//devices := findDevices()
-	//sendTestMessage(devices)
-
-	conn, err := net.Dial("tcp", "home.guywmoore.com:8080")
+func readJSONMessage(conn net.Conn) (err error) {
+	rawMessage, err := readMessage(conn)
 	if err != nil {
-		log.Fatal("Error opening connection.", err.Error())
-	}
-	defer conn.Close()
-
-	connectRequest(conn)
-
-	for {
-		if err := clientReadMessage(conn); err != nil {
-			log.Println("Reading from sockets has its problems.")
-		}
-
-		sendDummyFlow(conn)
-
-		time.Sleep(time.Second)
-	}
-}
-
-func clientReadMessage(conn net.Conn) error {
-	message, err := readJSON(conn)
-	if err != nil {
-		log.Println("Error reading json.")
 		return err
 	}
 
-	typedMessage, ok := message.(map[string]interface{})
+	var jsonMessage interface{}
+	decoder := json.NewDecoder(strings.NewReader(rawMessage))
+	decoder.Decode(&jsonMessage)
+	log.Println(jsonMessage)
+
+	typedMessage, ok := jsonMessage.(map[string]interface{})
 	if !ok {
 		return errors.New("Could not assert type of message.")
 	}
@@ -196,56 +178,32 @@ func clientReadMessage(conn net.Conn) error {
 	if !ok {
 		return errors.New("Could assert signal type to string.")
 	}
+	log.Debug("Signal type: ", signal)
 
-	data, ok := typedMessage["data"].(int)
+	data, ok := typedMessage["data"].(float64)
 	if !ok {
 		return errors.New("Data field wasn't a number.")
 	}
+	log.Debug("Data payload: ", data)
 
-	log.Println("data: " + strconv.Itoa(data))
-	if signal == signalFlow {
-		log.Print("Flow request received")
-	} else if signal == signalLevel {
-		log.Print("Level request received")
-	} else if signal == signalHeartbeat {
-		log.Print("Heartbeat received")
-		if err := heartbeatResponse(conn); err != nil {
-			log.Print("Error getting heartbeat response.")
-			log.Println(err.Error())
-			return err
-		}
-	} else if signal == signalConnectConfirm {
-		log.Println("Successfully connected to master server.")
-	} else {
-		log.Print("unknown signal")
-	}
-
-	return nil
+	return
 }
 
-func readJSON(conn net.Conn) (interface{}, error) {
+func readMessage(conn net.Conn) (string, error) {
 	// Set deadline for 3 seconds from now.
-	conn.SetReadDeadline(time.Now().Add(3 * time.Second))
+	conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	rawMessage, err := bufio.NewReader(conn).ReadString('\n')
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	log.Println("receiving", rawMessage)
 
 	// Remove newline delimeter.
-	jsonMessage := rawMessage[0 : len(rawMessage)-1]
-
-	var decodedMessage interface{}
-	decoder := json.NewDecoder(strings.NewReader(jsonMessage))
-	decoder.Decode(&decodedMessage)
-
-	return decodedMessage, nil
+	return rawMessage[0 : len(rawMessage)-1], nil
 }
 
 func writeJSON(conn net.Conn, jsonObject interface{}) error {
 	// Set deadline for 3 seconds from now.
-	conn.SetWriteDeadline(time.Now().Add(3 * time.Second))
-	log.Println("sending", jsonObject)
+	conn.SetWriteDeadline(time.Now().Add(10 * time.Second))
 	encoder := json.NewEncoder(conn)
 	err := encoder.Encode(jsonObject)
 	if err != nil {
