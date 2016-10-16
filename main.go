@@ -35,7 +35,14 @@ type Message map[string]interface{}
 func main() {
 	var mode = flag.String("mode", "client",
 		"Run the program in either shell mode or server mode")
+	var test = flag.Bool("test", false, "Test a feature")
+
 	flag.Parse()
+
+	if *test {
+		Testdb()
+		return
+	}
 
 	if *mode == clientMode {
 		cliShell()
@@ -47,8 +54,8 @@ func main() {
 }
 
 func startDaemon() {
-	log.Println("Starting server.")
-	listener, err := net.Listen("tcp", ":8080")
+	fmt.Println("Starting server.")
+	listener, err := net.Listen("tcp", "localhost:8080")
 	if err != nil {
 		log.Fatal(err.Error())
 	}
@@ -65,12 +72,14 @@ func startDaemon() {
 }
 
 func cliShell() {
-	log.Println("Connecting to server daemon")
+	fmt.Println("Connecting to server daemon")
 	conn, err := net.Dial("tcp", "localhost:8080")
 	if err != nil {
 		log.Fatal("Error opening connection.", err.Error())
 	}
 	defer conn.Close()
+
+	fmt.Println("Connected.")
 
 	messageChannel := make(chan Message, 10)
 	go handleConnection(conn)
@@ -78,6 +87,7 @@ func cliShell() {
 
 	var data int = -1
 	for {
+		fmt.Print("Enter a number to send to the server: ")
 		var input string
 		_, err = fmt.Scanln(&input)
 		if err != nil {
@@ -91,8 +101,6 @@ func cliShell() {
 			data = -1
 		}
 
-		log.Println("Sending: ", data)
-
 		message := Message{"signal": signalHeartbeat, "data": data}
 		messageChannel <- message
 	}
@@ -100,11 +108,9 @@ func cliShell() {
 
 func outgoingChannel(conn net.Conn, outgoing chan Message) {
 	defer conn.Close()
-
 	for {
 		currentMessage := <-outgoing
 
-		log.Println("sent")
 		err := writeJSON(conn, currentMessage)
 		if err != nil {
 			log.Println(err.Error())
@@ -178,13 +184,22 @@ func readJSONMessage(conn net.Conn) (err error) {
 	if !ok {
 		return errors.New("Could assert signal type to string.")
 	}
-	log.Debug("Signal type: ", signal)
+	log.Println("Signal type: ", signal)
 
+	fmt.Printf("%T\n", typedMessage["data"])
 	data, ok := typedMessage["data"].(float64)
 	if !ok {
 		return errors.New("Data field wasn't a number.")
 	}
-	log.Debug("Data payload: ", data)
+	log.Println("Data payload: ", data)
+
+	if signal == signalHeartbeat {
+		log.Println("Recording heartbeat")
+		err := RecordHeartbeat(data)
+		if err != nil {
+			panic(err.Error())
+		}
+	}
 
 	return
 }
