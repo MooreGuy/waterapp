@@ -1,76 +1,33 @@
-/*
-	TODO:
-		http server
-		Authenticate connections
-		Use TLS
-		Add fake device
-*/
 package main
 
 import (
-	"bufio"
-	"encoding/json"
-	"errors"
-	"flag"
-	"fmt"
 	"log"
 	"net"
-	"strings"
-	"time"
 )
 
-const (
-	clientMode = "client"
-	serverMode = "server"
+/* Probably want to implement this as a struct, but you know... woops */
+type Message map[string]interface{}
 
-	signalField = "signal"
-	dataField   = "data"
+/* Fixing my mistakes */
+// type MessageReal struct
 
-	signalHeartbeat         = "heartbeat"
-	signalHeartbeatResponse = "heartbeat_response"
-)
-
-func main() {
-	var mode = flag.String("mode", "client",
-		"Run the program in either shell mode or server mode")
-	var test = flag.Bool("test", false, "Test a feature")
-	var username = flag.String("u", "", "Username")
-	var password = flag.String("p", "", "Password")
-
-	flag.Parse()
-
-	if *test {
-		Testdb()
-		return
-	}
-
-	if *mode == clientMode {
-		StartCLIShell(*username, *password)
-	} else if *mode == serverMode {
-		startDaemon()
-	} else {
-		log.Fatal("Unknown mode: " + *mode)
+func sendHeartbeat(conn net.Conn) {
+	data := 0
+	message := Message{"signal": signalHeartbeat, "data": data}
+	if err := writeJSON(conn, message); err != nil {
+		log.Print("Sending heartbeat failed. ")
+		log.Println(err.Error())
 	}
 }
 
-func startDaemon() {
-	fmt.Println("Starting server.")
-	listener, err := net.Listen("tcp", "localhost:8080")
-	if err != nil {
-		log.Fatal(err.Error())
+func heartbeatResponse(conn net.Conn) error {
+	data := 0
+	message := Message{"signal": signalHeartbeatResponse, "data": data}
+	if err := writeJSON(conn, message); err != nil {
+		return err
 	}
 
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Fatal(err.Error())
-		}
-		defer conn.Close()
-
-		outgoingChan := make(chan Message, 10)
-		go outgoing(conn, outgoingChan)
-		go reading(conn, outgoingChan)
-	}
+	return nil
 }
 
 func readJSONMessage(conn net.Conn, outgoing chan Message) (err error) {

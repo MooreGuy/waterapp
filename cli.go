@@ -7,7 +7,7 @@ import (
 	"strconv"
 )
 
-func StartCLIShell() {
+func StartCLIShell(username string, password string) {
 	fmt.Println("Connecting to server daemon")
 	conn, err := net.Dial("tcp", "localhost:8080")
 	if err != nil {
@@ -18,8 +18,8 @@ func StartCLIShell() {
 	fmt.Println("Connected.")
 
 	messageChannel := make(chan Message, 10)
-	go handleConnection(conn)
-	go outgoingChannel(conn, messageChannel)
+	go reading(conn, messageChannel)
+	go outgoing(conn, messageChannel)
 
 	var data int = -1
 	for {
