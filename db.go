@@ -12,10 +12,6 @@ func Testdb() (*gocql.Session, error) {
 	cluster.Consistency = gocql.Quorum
 	cluster.Authenticator = gocql.PasswordAuthenticator{Username: "gmoore", Password: "meatandpotatoes"}
 	session, err := cluster.CreateSession()
-	if err != nil {
-		return session, err
-	}
-
 	return session, err
 }
 
@@ -31,10 +27,11 @@ func RecordHeartbeat(data float64) error {
 
 }
 
-func GetAllHeartbeats() error {
+func GetAllHeartbeats() (heartbeats map[gocql.UUID]int, err error) {
+	heartbeats = map[gocql.UUID]int{}
 	session, err := Testdb()
 	if err != nil {
-		return err
+		return
 	}
 	defer session.Close()
 
@@ -43,8 +40,9 @@ func GetAllHeartbeats() error {
 
 	iter := session.Query(`SELECT id, data FROM heartbeat`).Iter()
 	for iter.Scan(&id, &data) {
+		heartbeats[id] = data
 		fmt.Println("Heartbeat: ", id, data)
 	}
 	err = iter.Close()
-	return err
+	return heartbeats, err
 }
