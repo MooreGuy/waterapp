@@ -10,6 +10,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"github.com/MooreGuy/waterapp/device"
 	"log"
 	"net"
 	"net/http"
@@ -56,7 +57,12 @@ func startDaemon() {
 		log.Fatal(err.Error())
 	}
 
+	GetDeviceInfo()
 	go ListenSocketServer(listener)
+
+	devices := device.FindDevices()
+	log.Println(len(devices))
+
 	website := Website{}
 	fmt.Println("Starting web server.")
 	http.ListenAndServe(":8081", website)
@@ -73,5 +79,17 @@ func ListenSocketServer(listener net.Listener) {
 		outgoingChan := make(chan Message, 10)
 		go outgoing(conn, outgoingChan)
 		go reading(conn, outgoingChan)
+	}
+}
+
+func GetDeviceInfo() {
+	for {
+		log.Println("Reading devices")
+		devices := device.FindDevices()
+		for _, device := range devices {
+			readBuf := make([]byte, 2, 2)
+			device.Read(readBuf)
+			log.Println(readBuf)
+		}
 	}
 }
