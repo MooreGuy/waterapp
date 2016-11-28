@@ -1,4 +1,4 @@
-package main
+package network
 
 import (
 	"bufio"
@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func outgoing(conn net.Conn, outgoing chan Message) {
+func Outgoing(conn net.Conn, outgoing chan Message) {
 	for {
 		currentMessage := <-outgoing
 
@@ -26,7 +26,7 @@ func handleIncoming(incoming chan Message) {
 	}
 }
 
-func reading(conn net.Conn, incoming chan Message) {
+func Reading(conn net.Conn, incoming chan Message) {
 	for {
 		// Set deadline for 3 seconds from now.
 		conn.SetReadDeadline(time.Now().Add(10 * time.Second))

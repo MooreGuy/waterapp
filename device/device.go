@@ -1,14 +1,49 @@
 package device
 
 import (
-	"errors"
-	//	"bytes"
-	//	"encoding/binary"
+	"github.com/MooreGuy/waterapp/network"
+	"github.com/gocql/gocql"
+	"math/big"
+	"time"
 )
 
 const (
 	ValidVersion = 1
 )
+
+type Sensor interface {
+	Read() int
+	UUID() gocql.UUID
+}
+
+type FakeSensor struct {
+	uuid gocql.UUID
+}
+
+func NewFakeSensor() Sensor {
+	return FakeSensor{gocql.TimeUUID()}
+}
+
+func (s FakeSensor) UUID() gocql.UUID {
+	return s.uuid
+}
+
+func (s FakeSensor) Read() int {
+	return 1
+}
+
+func ReadSensors(messageQueue chan network.Message) {
+	fakeSensor := NewFakeSensor()
+	for {
+		mes := map[string]interface{}{
+			"data":     fakeSensor.Read(),
+			"sensorid": fakeSensor.UUID(),
+		}
+
+		messageQueue <- mes
+		time.Sleep(time.Second * 1)
+	}
+}
 
 // TODO: These should all be async, really gross that they're not.
 
@@ -41,9 +76,12 @@ func FindDevices() []*I2C {
 func FindFunctioningDevices(deviceList []*I2C) []*I2C {
 	functioningDevices := []*I2C{}
 	for _, device := range deviceList {
-		if read, err := device.ReadDevice(VersionRegister); err == nil &&
-			read == ValidVersion {
-			functioningDevices = append(functioningDevices, device)
+		if read, err := device.ReadRegister(VersionRegister); err == nil {
+			i := new(big.Int)
+			version := int32(i.SetBytes(read).Int64())
+			if version == ValidVersion {
+				functioningDevices = append(functioningDevices, device)
+			}
 		}
 	}
 

@@ -1,4 +1,4 @@
-package main
+package network
 
 import (
 	"encoding/json"
@@ -8,6 +8,14 @@ import (
 	"net"
 	"strings"
 	"time"
+)
+
+const (
+	signalField = "signal"
+	dataField   = "data"
+
+	signalHeartbeat         = "heartbeat"
+	signalHeartbeatResponse = "heartbeat_response"
 )
 
 // Probably want to implement this as a struct, but you know... woops
@@ -53,6 +61,12 @@ func JSONMessage(rawMessage string) (mes Message, err error) {
 	}
 	log.Println("Signal type: ", signal)
 
+	sensorid, ok := mes["sensorid"].(string)
+	if !ok {
+		return mes, errors.New("Could assert signal type to string.")
+	}
+	log.Println("Sensorid: ", sensorid)
+
 	fmt.Printf("%T\n", mes["data"])
 	data, ok := mes["data"].(float64)
 	if !ok {
@@ -60,6 +74,7 @@ func JSONMessage(rawMessage string) (mes Message, err error) {
 	}
 	log.Println("Data payload: ", data)
 
+	/**
 	if signal == signalHeartbeat {
 		log.Println("Recording heartbeat")
 		err := RecordHeartbeat(data)
@@ -67,6 +82,7 @@ func JSONMessage(rawMessage string) (mes Message, err error) {
 			panic(err.Error())
 		}
 	}
+	*/
 
 	return mes, err
 }
