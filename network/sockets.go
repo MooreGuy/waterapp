@@ -14,26 +14,18 @@ func Outgoing(conn net.Conn, outgoing chan Message) {
 
 		err := writeJSON(conn, currentMessage)
 		if err != nil {
-			log.Println(err.Error())
+			log.Println("ERROR WRITING JSON", err.Error())
 		}
 	}
 }
 
-func handleIncoming(incoming chan Message) {
-	for {
-		currentMessage := <-incoming
-		log.Println(currentMessage)
-	}
-}
-
+// Reads from the socket connection and puts read messages through json decoding
+// into messages, and then puts them in the incoming message channel.
 func Reading(conn net.Conn, incoming chan Message) {
 	for {
 		// Set deadline for 3 seconds from now.
 		conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 		rawMessage, err := bufio.NewReader(conn).ReadString('\n')
-		if err != nil {
-			log.Println(err.Error())
-		}
 		if err != nil {
 			opErr, ok := err.(net.Error)
 			if ok {
@@ -48,8 +40,6 @@ func Reading(conn net.Conn, incoming chan Message) {
 			if err == io.EOF {
 				return
 			}
-
-			log.Println(err.Error())
 		}
 
 		// Remove newline delimeter.

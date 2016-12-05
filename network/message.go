@@ -47,7 +47,6 @@ func JSONMessage(rawMessage string) (mes Message, err error) {
 	var jsonMessage interface{}
 	decoder := json.NewDecoder(strings.NewReader(rawMessage))
 	decoder.Decode(&jsonMessage)
-	log.Println(jsonMessage)
 	mes = map[string]interface{}{}
 
 	mes, ok := jsonMessage.(map[string]interface{})
@@ -55,24 +54,24 @@ func JSONMessage(rawMessage string) (mes Message, err error) {
 		return mes, errors.New("Could not assert type of message.")
 	}
 
-	signal, ok := mes["signal"].(string)
-	if !ok {
-		return mes, errors.New("Could assert signal type to string.")
-	}
-	log.Println("Signal type: ", signal)
+	return mes, nil
 
-	sensorid, ok := mes["sensorid"].(string)
-	if !ok {
-		return mes, errors.New("Could assert signal type to string.")
-	}
-	log.Println("Sensorid: ", sensorid)
+	/*
+		signal, ok := mes["signal"].(string)
+		if ok {
+			log.Println("Signal type: ", signal)
+		}
 
-	fmt.Printf("%T\n", mes["data"])
-	data, ok := mes["data"].(float64)
-	if !ok {
-		return mes, errors.New("Data field wasn't a number.")
-	}
-	log.Println("Data payload: ", data)
+		sensorid, ok := mes["sensorid"].(string)
+		if ok {
+			log.Println("Sensorid: ", sensorid)
+		}
+
+		data, ok := mes["data"].(float64)
+		if ok {
+			log.Println("Data payload: ", data)
+		}
+	*/
 
 	/**
 	if signal == signalHeartbeat {

@@ -9,11 +9,12 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 )
 
 const (
-	clientMode     = "client"
+	cliMode        = "cli"
 	controllerMode = "controller"
 	aggregatorMode = "aggregator"
 
@@ -25,7 +26,7 @@ const (
 )
 
 func main() {
-	var mode = flag.String("mode", "client",
+	var mode = flag.String("mode", cliMode,
 		"Run the program in either shell mode or server mode")
 	var test = flag.Bool("test", false, "Test a feature")
 	var username = flag.String("u", "", "Username")
@@ -38,7 +39,7 @@ func main() {
 		return
 	}
 
-	if *mode == clientMode {
+	if *mode == cliMode {
 		StartCLIShell(*username, *password)
 	} else if *mode == controllerMode {
 		StartController()
@@ -48,6 +49,10 @@ func main() {
 		log.Fatal("Unknown mode: " + *mode)
 	}
 
-	for {
+	log.Println("Startup process complete.")
+
+	var something string
+	fmt.Scanln(&something)
+	if something == "\n" {
 	}
 }

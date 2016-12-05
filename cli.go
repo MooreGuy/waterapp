@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"github.com/MooreGuy/waterapp/device"
+	"github.com/MooreGuy/waterapp/network"
 	"log"
 	"net"
 	"strconv"
@@ -9,7 +11,7 @@ import (
 
 func StartCLIShell(username string, password string) {
 	fmt.Println("Connecting to server daemon")
-	conn, err := net.Dial("tcp", "localhost:8080")
+	conn, err := net.Dial("tcp", "localhost:6667")
 	if err != nil {
 		log.Fatal("Error opening connection.", err.Error())
 	}
@@ -17,9 +19,9 @@ func StartCLIShell(username string, password string) {
 
 	fmt.Println("Connected.")
 
-	messageChannel := make(chan Message, 10)
-	go reading(conn, messageChannel)
-	go outgoing(conn, messageChannel)
+	messageChannel := make(chan network.Message, 10)
+	go network.Reading(conn, messageChannel)
+	go network.Outgoing(conn, messageChannel)
 
 	var data int = -1
 	for {
@@ -36,13 +38,23 @@ func StartCLIShell(username string, password string) {
 			continue
 		}
 
-		data, err = strconv.Atoi(input)
-		if err != nil {
-			log.Println("Bad input, enter number.")
-			data = -1
+		if input == "all-devices" {
+			fmt.Println(device.GetFakeDevices())
+			continue
 		}
 
-		message := Message{"signal": signalHeartbeat, "data": data}
+		data, err = strconv.Atoi(input)
+		for err != nil {
+			log.Println("Bad input, enter number.")
+			data, err = strconv.Atoi(input)
+		}
+
+		var dev device.Device
+		for _, dev = range device.GetFakeDevices() {
+			break
+		}
+
+		message := network.Message{"deviceid": dev.UUID(), "signal": "valve-turn", "data": data}
 		messageChannel <- message
 	}
 }

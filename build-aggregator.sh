@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-GOARCH=amd64 GOOS=freebsd go build -v github.com/MooreGuy/waterapp
+GOARCH=amd64 GOOS=freebsd go build -o waterapp-freebsd -v github.com/MooreGuy/waterapp
 
-scp "waterapp" "$1:/home/freebsd/waterapp"
-ssh -t "$1" "sudo /home/freebsd/waterapp -mode aggregator"
+scp "waterapp-freebsd" "$1:/home/freebsd/waterapp-freebsd"
+ssh -t "$1" "sudo /home/freebsd/waterapp-freebsd -mode aggregator"

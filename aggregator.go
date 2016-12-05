@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/MooreGuy/waterapp/network"
 	"log"
 	"net"
 )
@@ -13,6 +14,7 @@ func StartAggregator() {
 		log.Fatal(err.Error())
 	}
 
+	fmt.Println("Handle incoming connections.")
 	go ListenAggregatorServer(listener)
 }
 
@@ -27,17 +29,20 @@ func ListenAggregatorServer(listener net.Listener) {
 
 		log.Println("Got connection.")
 
-		outgoingChan := make(chan Message, 100)
-		go outgoing(conn, outgoingChan)
-		incomingChan := make(chan Message, 100)
-		go reading(conn, incomingChan)
-		go handleIncoming(incomingChan)
+		// Sets up network communication channels.
+		outgoingChan := make(chan network.Message, 100)
+		go network.Outgoing(conn, outgoingChan)
+		incomingChan := make(chan network.Message, 100)
+		go network.Reading(conn, incomingChan)
+
+		// Handles incoming messages.
+		go aggregatorHandleIncoming(incomingChan)
 	}
 }
 
-func aggregatorHandleIncoming(incoming chan Message) {
+func aggregatorHandleIncoming(incoming chan network.Message) {
 	for {
 		currentMessage := <-incoming
-		log.Println(currentMessage)
+		log.Println("Aggregator handling message", currentMessage)
 	}
 }

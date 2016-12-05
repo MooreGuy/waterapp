@@ -3,6 +3,7 @@ package device
 import (
 	"github.com/MooreGuy/waterapp/network"
 	"github.com/gocql/gocql"
+	"log"
 	"math/big"
 	"time"
 )
@@ -40,9 +41,54 @@ func ReadSensors(messageQueue chan network.Message) {
 			"sensorid": fakeSensor.UUID(),
 		}
 
+		log.Println("Sending fake sensor data.")
 		messageQueue <- mes
 		time.Sleep(time.Second * 1)
 	}
+}
+
+func HandleDeviceSignal() (commandQueue chan Command) {
+	commandQueue = make(chan Command, 100)
+	go func(commandQueue chan Command) {
+		for {
+			command := <-commandQueue
+			devices := GetFakeDevices()
+			devices.sendCommand(command)
+		}
+	}(commandQueue)
+
+	return
+}
+
+type Device struct {
+	uuid gocql.UUID
+}
+
+func (d Device) UUID() gocql.UUID {
+	return d.uuid
+}
+
+type Command struct {
+	Name   string
+	Data   int
+	Target gocql.UUID
+}
+
+type DeviceCollection map[gocql.UUID]Device
+
+func (col DeviceCollection) sendCommand(c Command) {
+	_, ok := col[c.Target]
+	if !ok {
+		log.Println("Couldn't find device")
+		log.Println(c.Target)
+	}
+
+	log.Println("This is where the device should be given the command.", c.Data)
+}
+
+func GetFakeDevices() DeviceCollection {
+	uuid := gocql.TimeUUID()
+	return DeviceCollection{uuid: Device{uuid}}
 }
 
 // TODO: These should all be async, really gross that they're not.
