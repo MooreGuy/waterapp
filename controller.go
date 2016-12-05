@@ -90,6 +90,7 @@ func ListenForInternalControl(outgoing chan network.Message, incoming chan netwo
 func handleControlMessage(incomingControl chan network.Message, commandQueue chan device.Command) {
 	for {
 		mes := <-incomingControl
+		log.Println(mes)
 		signal, ok := mes["signal"].(string)
 		if !ok {
 			log.Println("Missing signal")

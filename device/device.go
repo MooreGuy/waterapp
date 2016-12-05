@@ -87,7 +87,10 @@ func (col DeviceCollection) sendCommand(c Command) {
 }
 
 func GetFakeDevices() DeviceCollection {
-	uuid := gocql.TimeUUID()
+	uuid, err := gocql.ParseUUID("9ce48250-bab4-11e6-a205-525400f5bde1")
+	if err != nil {
+		panic(err)
+	}
 	return DeviceCollection{uuid: Device{uuid}}
 }
 
