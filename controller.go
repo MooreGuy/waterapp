@@ -25,11 +25,11 @@ func StartController() {
 
 	outgoingControl := make(chan network.Message, 100)
 	incomingControl := make(chan network.Message, 100)
-	go ConnectToExtenrnalController(outgoingControl, incomingControl)
+	go ConnectToExternalController(outgoingControl, incomingControl)
 	go ListenForInternalControl(outgoingControl, incomingControl)
 
 	commandQueue := device.HandleDeviceSignal()
-	go handleControlMessage(incomingControl, commandQueue)
+	go handleControlMessage(incomingControl, outgoingControl, commandQueue)
 	//GetDeviceInfo()
 	//devices := device.FindDevices()
 	//log.Println(len(devices))
@@ -54,7 +54,7 @@ func ConnectToAggregator(outgoing chan network.Message, incoming chan network.Me
 }
 
 // Starts a listening routine that listens for control requests.
-func ConnectToExtenrnalController(outgoing chan network.Message, incoming chan network.Message) {
+func ConnectToExternalController(outgoing chan network.Message, incoming chan network.Message) {
 	extConAddress := "138.68.46.103"
 	extConPort := "6667"
 	conn, err := net.Dial("tcp", extConAddress+":"+extConPort)
@@ -87,39 +87,44 @@ func ListenForInternalControl(outgoing chan network.Message, incoming chan netwo
 }
 
 // TODO: Use custom handlers to handle control, and aggregation.
-func handleControlMessage(incomingControl chan network.Message, commandQueue chan device.Command) {
+func handleControlMessage(incomingControl chan network.Message, outgoingControl chan network.Message, commandQueue chan device.Command) {
 	for {
 		mes := <-incomingControl
-		log.Println(mes)
 		signal, ok := mes["signal"].(string)
 		if !ok {
 			log.Println("Missing signal")
 			continue
 		}
 
-		deviceid, ok := mes["deviceid"].(string)
-		if !ok {
-			log.Println("Missing deviceid")
-			continue
+		if signal == "valve-turn" {
+			deviceid, ok := mes["deviceid"].(string)
+			if !ok {
+				log.Println("Missing deviceid")
+				continue
+			}
+
+			data, ok := mes["data"].(float64)
+			if !ok {
+				log.Println("Missing data")
+				continue
+			}
+			log.Println("Control signal type: ", signal)
+			log.Println("deviceid: ", deviceid)
+			log.Println("Data payload: ", data)
+
+			uuid, err := gocql.ParseUUID(deviceid)
+			if err != nil {
+				log.Println("Invalid id")
+				continue
+			}
+
+			command := device.Command{Target: uuid, Data: int(data), Name: signal}
+			commandQueue <- command
+		} else if signal == "list-devices" {
+			devices := device.GetDevices()
+			outgoingControl <- network.Message{"devices": devices}
 		}
 
-		data, ok := mes["data"].(float64)
-		if !ok {
-			log.Println("Missing data")
-			continue
-		}
-		log.Println("Control signal type: ", signal)
-		log.Println("deviceid: ", deviceid)
-		log.Println("Data payload: ", data)
-
-		uuid, err := gocql.ParseUUID(deviceid)
-		if err != nil {
-			log.Println("Invalid id")
-			continue
-		}
-
-		command := device.Command{Target: uuid, Data: int(data), Name: signal}
-		commandQueue <- command
 		//_, deviceOnThisController := devices[deviceid]
 		/*
 			if signal == "valve-turn" && deviceOnThisController {

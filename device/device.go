@@ -86,6 +86,10 @@ func (col DeviceCollection) sendCommand(c Command) {
 	log.Println("This is where the device should be given the command.", c.Data)
 }
 
+func GetDevices() DeviceCollection {
+	return GetFakeDevices()
+}
+
 func GetFakeDevices() DeviceCollection {
 	uuid, err := gocql.ParseUUID("9ce48250-bab4-11e6-a205-525400f5bde1")
 	if err != nil {

@@ -38,7 +38,7 @@ func StartCLIShell(username string, password string) {
 			continue
 		}
 
-		if input == "all-devices" {
+		if input == "list-devices" {
 			fmt.Println(device.GetFakeDevices())
 			continue
 		}
