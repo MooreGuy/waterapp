@@ -11,9 +11,57 @@ import (
 	"time"
 )
 
+func StartMasterController() {
+	log.Println("Starting http api server")
+	go http.ListenAndServe(":8080", masterControllerAPI)
+
+	log.Println("Starting socket server")
+	outgoingControl := make(chan network.Message, 100)
+	incomingControl := make(chan network.Message, 100)
+	go ListenForConnections(outgoingControl, incomingControl)
+}
+
+func ListenForConnections(incoming chan network.Message, outgoing chan network.Message) {
+	listener, err := net.Listen("tcp", ":6667")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println(err)
+		}
+		go network.Outgoing(conn, outgoing)
+		go network.Reading(conn, incoming)
+		log.Println("Internal controller connected.")
+	}
+}
+
+func HandleMasterControllerMessages(incoming chan network.Message, outgoing chan network.Message) {
+	for {
+		mes := <-incoming
+		signal, ok := mes["signal"].(string)
+		if !ok {
+			log.Println("Missing signal")
+			continue
+		}
+
+		id, ok := mes["deviceid"].(string)
+		if !ok {
+			log.Println("Missing deviceid")
+			continue
+		}
+
+		if signal == "valve-turn" {
+			log.Println("Turing valve for " + id)
+		}
+	}
+}
+
 func StartController() {
 	website := Website{}
-	fmt.Println("Starting controller web management console.")
+	log.Println("Starting controller web management console.")
 	go http.ListenAndServe(":8081", website)
 
 	log.Println("Connecting to aggregator.")
@@ -33,7 +81,6 @@ func StartController() {
 	//GetDeviceInfo()
 	//devices := device.FindDevices()
 	//log.Println(len(devices))
-
 }
 
 func ConnectToAggregator(outgoing chan network.Message, incoming chan network.Message) {
@@ -67,6 +114,9 @@ func ConnectToExternalController(outgoing chan network.Message, incoming chan ne
 	go network.Outgoing(conn, outgoing)
 	go network.Reading(conn, incoming)
 	log.Println("Connected to external controller.")
+
+	commandQueue := device.HandleDeviceSignal()
+	go handleControlMessage(outgoing, incoming, commandQueue)
 }
 
 func ListenForInternalControl(outgoing chan network.Message, incoming chan network.Message) {
