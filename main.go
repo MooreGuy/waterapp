@@ -14,9 +14,10 @@ import (
 )
 
 const (
-	cliMode        = "cli"
-	controllerMode = "controller"
-	aggregatorMode = "aggregator"
+	cliMode          = "cli"
+	controllerMode   = "controller"
+	aggregatorMode   = "aggregator"
+	masterController = "masterController"
 
 	signalField = "signal"
 	dataField   = "data"
@@ -45,6 +46,8 @@ func main() {
 		StartController()
 	} else if *mode == aggregatorMode {
 		StartAggregator()
+	} else if *mode == masterController {
+		StartMasterController()
 	} else {
 		log.Fatal("Unknown mode: " + *mode)
 	}

@@ -11,9 +11,15 @@ import (
 	"time"
 )
 
+type masterControllerAPI struct{}
+
+func (this masterControllerAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "Unimplemented")
+}
+
 func StartMasterController() {
 	log.Println("Starting http api server")
-	go http.ListenAndServe(":8080", masterControllerAPI)
+	go http.ListenAndServe(":8080", masterControllerAPI{})
 
 	log.Println("Starting socket server")
 	outgoingControl := make(chan network.Message, 100)
