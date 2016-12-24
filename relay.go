@@ -92,7 +92,35 @@ func StartRelay() {
 	go http.ListenAndServe(":8080", relayAPI{outgoingControl})
 
 	log.Println("Starting master controller socket server")
-	go ListenForConnections(outgoingControl, incomingControl)
+	go network.ListenForConnections(outgoingControl, incomingControl)
+}
+
+type relayConnection struct {
+	incoming chan network.Message
+	outgoing chan network.Message
+}
+
+type deviceUpdate struct {
+	deviceid int
+	conn     relayConnection
+}
+
+type relayRequest struct {
+	deviceid int
+	message  network.Message
+}
+
+// Given deviceids
+func RelayRouter(deviceUpdates chan DeviceUpdate, relayRequests chan RelayRequest) {
+	controllerConnections := map[int]relayConnection{}
+	for {
+		select {
+		case deviceUpdate := <-deviceUpdates:
+			controllerConnections[deviceUpdate.deviceid] = deviceUpdate.conn
+		case relayRequest := <-relayRequests:
+			controllerConnections[relayRequest.deviceid].outgoing <- relayRequest.message
+		}
+	}
 }
 
 func HandleMasterControllerMessages(incoming chan network.Message, outgoing chan network.Message) {
