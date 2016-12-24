@@ -1,48 +1,16 @@
 package main
 
 import (
-	"fmt"
+	"encoding/json"
 	"github.com/MooreGuy/waterapp/device"
 	"github.com/MooreGuy/waterapp/network"
 	"github.com/gocql/gocql"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"time"
 )
-
-type masterControllerAPI struct{}
-
-func (this masterControllerAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "Unimplemented")
-}
-
-func StartMasterController() {
-	log.Println("Starting http api server")
-	go http.ListenAndServe(":8080", masterControllerAPI{})
-
-	log.Println("Starting socket server")
-	outgoingControl := make(chan network.Message, 100)
-	incomingControl := make(chan network.Message, 100)
-	go ListenForConnections(outgoingControl, incomingControl)
-}
-
-func ListenForConnections(incoming chan network.Message, outgoing chan network.Message) {
-	listener, err := net.Listen("tcp", ":6667")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Println(err)
-		}
-		go network.Outgoing(conn, outgoing)
-		go network.Reading(conn, incoming)
-		log.Println("Internal controller connected.")
-	}
-}
 
 func HandleMasterControllerMessages(incoming chan network.Message, outgoing chan network.Message) {
 	for {
@@ -80,7 +48,7 @@ func StartController() {
 	outgoingControl := make(chan network.Message, 100)
 	incomingControl := make(chan network.Message, 100)
 	go ConnectToExternalController(outgoingControl, incomingControl)
-	go ListenForInternalControl(outgoingControl, incomingControl)
+	go network.ListenForConnections(":6667", outgoingControl, incomingControl)
 
 	commandQueue := device.HandleDeviceSignal()
 	go handleControlMessage(incomingControl, outgoingControl, commandQueue)
@@ -123,23 +91,6 @@ func ConnectToExternalController(outgoing chan network.Message, incoming chan ne
 
 	commandQueue := device.HandleDeviceSignal()
 	go handleControlMessage(outgoing, incoming, commandQueue)
-}
-
-func ListenForInternalControl(outgoing chan network.Message, incoming chan network.Message) {
-	listener, err := net.Listen("tcp", ":6667")
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			log.Println(err)
-		}
-		go network.Outgoing(conn, outgoing)
-		go network.Reading(conn, incoming)
-		log.Println("Internal controller connected.")
-	}
 }
 
 // TODO: Use custom handlers to handle control, and aggregation.

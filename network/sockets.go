@@ -8,6 +8,23 @@ import (
 	"time"
 )
 
+func ListenForConnections(address string, incoming chan Message, outgoing chan Message) {
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println(err)
+		}
+		go network.Outgoing(conn, outgoing)
+		go network.Reading(conn, incoming)
+		log.Println("new connection")
+	}
+}
+
 func Outgoing(conn net.Conn, outgoing chan Message) {
 	for {
 		currentMessage := <-outgoing
