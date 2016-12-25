@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+type NetConn struct {
+	incoming chan Message
+	outgoing chan Message
+}
+
 func ListenForConnections(address string, incoming chan Message, outgoing chan Message) {
 	listener, err := net.Listen("tcp", address)
 	if err != nil {
@@ -21,6 +26,26 @@ func ListenForConnections(address string, incoming chan Message, outgoing chan M
 		}
 		go network.Outgoing(conn, outgoing)
 		go network.Reading(conn, incoming)
+		log.Println("new connection")
+	}
+}
+
+func ListenAndStoreConnections(address string, connections chan connection) {
+	listener, err := net.Listen("tcp", address)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			log.Println(err)
+		}
+
+		net := NetConn{make(chan Message, 100), make(chan Message, 100)}
+		go network.Outgoing(conn, NetConn.outgoing)
+		go network.Reading(conn, NetConn.incoming)
+		connections <- connChan
 		log.Println("new connection")
 	}
 }

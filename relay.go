@@ -82,27 +82,36 @@ func validDeviceid(stringDeviceid string) bool {
 	return true
 }
 
-// TODO: This should be renamed to "relay" since all it is doing is checking to
-//       make sure that they are valid messages going to valid controllers from
-//       valid clients from valid users.
+// TODO: Relay requests should be authenticated.
 func StartRelay() {
-	outgoingControl := make(chan network.Message, 100)
-	incomingControl := make(chan network.Message, 100)
+	deviceUpdates := make(chan deviceUpdate, 100)
+	relayRequests := make(chan relayRequest, 100)
+
+	go RelayRouter(deviceUpdates, relayRequests)
+
 	log.Println("Starting master http api server")
-	go http.ListenAndServe(":8080", relayAPI{outgoingControl})
+	go http.ListenAndServe(":8080", relayAPI{outgoingControl, relayRequests})
 
 	log.Println("Starting master controller socket server")
 	go network.ListenForConnections(outgoingControl, incomingControl)
 }
 
-type relayConnection struct {
-	incoming chan network.Message
-	outgoing chan network.Message
+func ManageRelayConnections(connectionUpdate, droppedConnections) {
+	devices
+	for {
+		select {
+		case newConnection := <-newConnections:
+			append(allConnections, newConnection)
+		case droppedConnection := <-droppedConnections:
+			log.Println("TODO, actually remove the connection.")
+		}
+	}
 }
 
 type deviceUpdate struct {
 	deviceid int
 	conn     relayConnection
+	task     string
 }
 
 type relayRequest struct {
@@ -111,11 +120,17 @@ type relayRequest struct {
 }
 
 // Given deviceids
-func RelayRouter(deviceUpdates chan DeviceUpdate, relayRequests chan RelayRequest) {
+func RelayRouter(deviceUpdates chan deviceUpdate, relayRequests chan RelayRequest) {
+	allConnections := []network.NetConn{}
 	controllerConnections := map[int]relayConnection{}
 	for {
 		select {
 		case deviceUpdate := <-deviceUpdates:
+			switch deviceUpdate.task {
+			case "add":
+				allConnections := append(allConnections, deviceUpdate.conn)
+			case "remove":
+			}
 			controllerConnections[deviceUpdate.deviceid] = deviceUpdate.conn
 		case relayRequest := <-relayRequests:
 			controllerConnections[relayRequest.deviceid].outgoing <- relayRequest.message
