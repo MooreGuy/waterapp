@@ -17,7 +17,7 @@ const (
 	cliMode        = "cli"
 	controllerMode = "controller"
 	aggregatorMode = "aggregator"
-	relayMode      = "relayMode"
+	relayMode      = "relay"
 
 	signalField = "signal"
 	dataField   = "data"
