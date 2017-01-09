@@ -1,17 +1,16 @@
 package main
 
 import (
-	"encoding/json"
 	"github.com/MooreGuy/waterapp/device"
 	"github.com/MooreGuy/waterapp/network"
 	"github.com/gocql/gocql"
-	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"time"
 )
 
+/*
 func HandleMasterControllerMessages(incoming chan network.Message, outgoing chan network.Message) {
 	for {
 		mes := <-incoming
@@ -32,6 +31,7 @@ func HandleMasterControllerMessages(incoming chan network.Message, outgoing chan
 		}
 	}
 }
+*/
 
 func StartController() {
 	website := Website{}

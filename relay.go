@@ -1,7 +1,11 @@
 package main
 
 import (
+	"encoding/json"
+	"github.com/MooreGuy/waterapp/network"
+	"io/ioutil"
 	"log"
+	"net/http"
 )
 
 type relayAPI struct {
@@ -19,7 +23,7 @@ func (this relayAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		this.handleValveSwitch(w, r)
+		this.relayRequest(w, r)
 	} else {
 		http.NotFound(w, r)
 	}
@@ -84,34 +88,17 @@ func validDeviceid(stringDeviceid string) bool {
 
 // TODO: Relay requests should be authenticated.
 func StartRelay() {
-	deviceUpdates := make(chan deviceUpdate, 100)
-	relayRequests := make(chan relayRequest, 100)
-
+	commands := make(chan network.connCommand, 10)
+	go network.ManageConns(commands)
 	go RelayRouter(deviceUpdates, relayRequests)
 
-	log.Println("Starting master http api server")
+	log.Println("Starting relay http api server")
 	go http.ListenAndServe(":8080", relayAPI{outgoingControl, relayRequests})
 
-	log.Println("Starting master controller socket server")
-	go network.ListenForConnections(outgoingControl, incomingControl)
-}
-
-func ManageRelayConnections(connectionUpdate, droppedConnections) {
-	devices
-	for {
-		select {
-		case newConnection := <-newConnections:
-			append(allConnections, newConnection)
-		case droppedConnection := <-droppedConnections:
-			log.Println("TODO, actually remove the connection.")
-		}
-	}
-}
-
-type deviceUpdate struct {
-	deviceid int
-	conn     relayConnection
-	task     string
+	in := make(chan Message, 100)
+	out := make(chan Message, 100)
+	log.Println("Starting relay socket server")
+	go network.SocketServer(":*8081", in, out)
 }
 
 type relayRequest struct {
@@ -119,10 +106,10 @@ type relayRequest struct {
 	message  network.Message
 }
 
-// Given deviceids
+// Takes in relay requests then routes them to the
 func RelayRouter(deviceUpdates chan deviceUpdate, relayRequests chan RelayRequest) {
 	allConnections := []network.NetConn{}
-	controllerConnections := map[int]relayConnection{}
+	controllerConnections := map[int]netowork.NetConn{}
 	for {
 		select {
 		case deviceUpdate := <-deviceUpdates:
@@ -138,6 +125,7 @@ func RelayRouter(deviceUpdates chan deviceUpdate, relayRequests chan RelayReques
 	}
 }
 
+/*
 func HandleMasterControllerMessages(incoming chan network.Message, outgoing chan network.Message) {
 	for {
 		mes := <-incoming
@@ -158,3 +146,4 @@ func HandleMasterControllerMessages(incoming chan network.Message, outgoing chan
 		}
 	}
 }
+*/
