@@ -88,9 +88,9 @@ func validDeviceid(stringDeviceid string) bool {
 
 // TODO: Relay requests should be authenticated.
 func StartRelay() {
-	commands := make(chan network.connCommand, 10)
-	go network.ManageConns(commands)
-	go RelayRouter(deviceUpdates, relayRequests)
+	relayCommands := make(chan network.ConnCommand, 10)
+	log.Println("Starting relay router.")
+	go RelayRouter(relayCommands)
 
 	log.Println("Starting relay http api server")
 	go http.ListenAndServe(":8080", relayAPI{outgoingControl, relayRequests})
@@ -101,49 +101,32 @@ func StartRelay() {
 	go network.SocketServer(":*8081", in, out)
 }
 
-type relayRequest struct {
-	deviceid int
-	message  network.Message
+// Command to update a connection.
+// connectionid uniquely identifies a connection.
+// conn are channels for the connection
+// command is what we should do to the identified connection
+// Message is a message that should be sent out over the connection
+type RelayCommand struct {
+	connectionid int
+	conn         NetConn
+	commandName  string
+	mes          Message
 }
 
 // Takes in relay requests then routes them to the
-func RelayRouter(deviceUpdates chan deviceUpdate, relayRequests chan RelayRequest) {
-	allConnections := []network.NetConn{}
-	controllerConnections := map[int]netowork.NetConn{}
+func RelayRouter(relayRequests chan RelayCommand) {
+	connPool := map[int]network.NetConn{}
 	for {
-		select {
-		case deviceUpdate := <-deviceUpdates:
-			switch deviceUpdate.task {
-			case "add":
-				allConnections := append(allConnections, deviceUpdate.conn)
-			case "remove":
-			}
-			controllerConnections[deviceUpdate.deviceid] = deviceUpdate.conn
-		case relayRequest := <-relayRequests:
-			controllerConnections[relayRequest.deviceid].outgoing <- relayRequest.message
+		com := <-RelayCommands:
+		switch com.task {
+		case "add":
+			connPool[com.connectionid] = com.conn
+			break
+		case "remove":
+			// TODO: Implement connection removal.
+			break
+		case "route"
+			connPool[com.connectionid].conn.outgoing <-com.message
 		}
 	}
 }
-
-/*
-func HandleMasterControllerMessages(incoming chan network.Message, outgoing chan network.Message) {
-	for {
-		mes := <-incoming
-		signal, ok := mes["signal"].(string)
-		if !ok {
-			log.Println("Missing signal")
-			continue
-		}
-
-		id, ok := mes["deviceid"].(string)
-		if !ok {
-			log.Println("Missing deviceid")
-			continue
-		}
-
-		if signal == "valve-turn" {
-			log.Println("Turing valve for " + id)
-		}
-	}
-}
-*/

@@ -106,30 +106,21 @@ func SocketServer(address string, in chan Message, out chan Message) {
 	}
 }
 
-// Command to update a connection.
-// connectionid uniquely identifies a connection.
-// conn are channels for the connection
-// command is what we should do to the identified connection
-// Message is a message that should be sent out over the connection
-type ConnCommand struct {
-	connectionid int
-	conn         NetConn
-	commandName  string
-	mes          Message
-}
 
 // Stores and manages the state of the relay connections
-func ManageConns(commands chan connCommand) {
-	conns := []NetConn{}
+func PoolConns(commands chan ConnCommand) {
 	for {
 		command := <-commands
 		switch command.commandName {
 		case "add":
 			log.Println("Added new connection")
-			conns = append(conns, command.conn)
+			conns[command.connectionid] = conn
 			break
 		case "delete":
 			log.Println("TODO, actually remove the connection.")
+			break
+		case "get":
+			log.Println("TODO , return the pointer to this connection.")
 			break
 		}
 	}
