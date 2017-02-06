@@ -9,8 +9,8 @@ import (
 )
 
 type NetConn struct {
-	incoming chan Message
-	outgoing chan Message
+	Incoming chan Message
+	Outgoing chan Message
 }
 
 func ListenForConnections(address string, incoming chan Message, outgoing chan Message) {
@@ -74,6 +74,7 @@ func Reading(conn net.Conn, incoming chan Message) {
 	}
 }
 
+/*
 // Starts a socket server that listens for incoming connections and manages
 // them based on commands.
 // Receives a channel for all messages that should be routed, and then another
@@ -87,7 +88,6 @@ func SocketServer(address string, in chan Message, out chan Message) {
 		log.Fatal(err)
 	}
 
-	i := 0
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
@@ -100,28 +100,8 @@ func SocketServer(address string, in chan Message, out chan Message) {
 		go Reading(conn, in)
 
 		addConn := connCommand{i, net, "add", nil}
-		i = i + 1
 		connManager <- addConn
 		log.Println("sent add command")
 	}
 }
-
-
-// Stores and manages the state of the relay connections
-func PoolConns(commands chan ConnCommand) {
-	for {
-		command := <-commands
-		switch command.commandName {
-		case "add":
-			log.Println("Added new connection")
-			conns[command.connectionid] = conn
-			break
-		case "delete":
-			log.Println("TODO, actually remove the connection.")
-			break
-		case "get":
-			log.Println("TODO , return the pointer to this connection.")
-			break
-		}
-	}
-}
+*/

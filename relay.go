@@ -9,7 +9,7 @@ import (
 )
 
 type relayAPI struct {
-	outgoing chan network.Message
+	commands chan RelayCommand
 }
 
 func (this relayAPI) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -74,9 +74,15 @@ func (this relayAPI) relayRequest(w http.ResponseWriter, r *http.Request) {
 		"deviceid": deviceidString,
 		"data":     data,
 	}
+	relayCommand := RelayCommand{
+		connectionid: 1,
+		conn:         network.NetConn{},
+		commandName:  "something",
+		mes:          commandMessage,
+	}
 
-	log.Println("Relaying message.", commandMessage)
-	this.outgoing <- commandMessage
+	log.Println("Relaying message.", relayCommand)
+	this.commands <- relayCommand
 }
 
 // TODO: Actually confirm a deviceid is valid to operate on for a given user
@@ -88,17 +94,15 @@ func validDeviceid(stringDeviceid string) bool {
 
 // TODO: Relay requests should be authenticated.
 func StartRelay() {
-	relayCommands := make(chan network.ConnCommand, 10)
+	//	in := make(chan network.Message, 100)
+	//	out := make(chan network.Message, 100)
+	//	log.Println("Starting relay socket server")
+	//	go network.RelayRouter(":*8081", in, out)
+	relayCommands := make(chan RelayCommand, 10)
 	log.Println("Starting relay router.")
 	go RelayRouter(relayCommands)
-
 	log.Println("Starting relay http api server")
-	go http.ListenAndServe(":8080", relayAPI{outgoingControl, relayRequests})
-
-	in := make(chan Message, 100)
-	out := make(chan Message, 100)
-	log.Println("Starting relay socket server")
-	go network.SocketServer(":*8081", in, out)
+	go http.ListenAndServe(":8080", relayAPI{relayCommands})
 }
 
 // Command to update a connection.
@@ -108,25 +112,25 @@ func StartRelay() {
 // Message is a message that should be sent out over the connection
 type RelayCommand struct {
 	connectionid int
-	conn         NetConn
+	conn         network.NetConn
 	commandName  string
-	mes          Message
+	mes          network.Message
 }
 
 // Takes in relay requests then routes them to the
-func RelayRouter(relayRequests chan RelayCommand) {
+func RelayRouter(relays chan RelayCommand) {
 	connPool := map[int]network.NetConn{}
 	for {
-		com := <-RelayCommands:
-		switch com.task {
+		relay := <-relays
+		switch relay.commandName {
 		case "add":
-			connPool[com.connectionid] = com.conn
+			connPool[relay.connectionid] = relay.conn
 			break
 		case "remove":
 			// TODO: Implement connection removal.
 			break
-		case "route"
-			connPool[com.connectionid].conn.outgoing <-com.message
+		case "route":
+			connPool[relay.connectionid].Outgoing <- relay.mes
 		}
 	}
 }
